@@ -8,19 +8,17 @@ import matplotlib.pyplot as plt
 
 device = torch.device(0)
 
-delta_t = 1 # Mess around with this
-
-
 out_ndim = 1
-#poisson_params = 6.28318  #2pi, initial test case, change later.
-#poisson_params = 12.56637  #4pi, initial test case, change later.
-poisson_params = 25.13274  #8pi, initial test case, change later.
+
 ckptpath = 'checkpoint/simulator_%s.pth' % Func.func_name  
 
-func_main = Func(delta_t=delta_t, params=poisson_params)
-
-ic = func_main.init_condition
-bc1 = func_main.boundary_condition
+func_main = Func(eps=(4.0,2.0,1.0),
+    k  =(20.0,10.0, 5.0),
+    center=(0.5,0.5),
+    r1=0.15,
+    r2=0.30,
+    bc_tol=1e-3
+)
 
 model = msgPassing(message_passing_num=3, node_input_size=out_ndim+2, edge_input_size=3, 
                    ndim=out_ndim, device=device, model_dir=ckptpath)    # Mess with MPN# to 2 or 3, +3 comes from source + BC
@@ -76,19 +74,15 @@ plt.show()
 train_config = parse_config()
 writer = SummaryWriter('runs/%s' % Func.func_name)   
  
-setattr(train_config, 'pde', func_main.pde)
+setattr(train_config, 'pde', func_main.pde_residual)
 setattr(train_config, 'graph_modify', func_main.graph_modify)        
-setattr(train_config, 'delta_t', delta_t)
-setattr(train_config, 'ic', ic)
-setattr(train_config, 'bc1', bc1)
 setattr(train_config, 'graph', graph)
 setattr(train_config, 'model', model)
 setattr(train_config, 'optimizer', optimizer)
 setattr(train_config, 'train_steps', 1)    # 1 train step, extend this in the future to a dynamic source function that changes with time.
-setattr(train_config, 'epchoes', 5000)
+setattr(train_config, 'epchoes', 50)
 setattr(train_config, 'NodeTypesRef', ElectrodeMesh.node_type_ref) 
 setattr(train_config, 'step_times', 1)
-#setattr(train_config, 'name', func_name)
 setattr(train_config, 'ndim', out_ndim)
 setattr(train_config, 'lrstep', 100) #learning rate decay epchoes
 setattr(train_config, 'writer', writer)
