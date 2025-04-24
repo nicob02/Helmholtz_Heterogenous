@@ -49,30 +49,70 @@ def modelTrainer(config):
     graph = config.graph
     scheduler = torch.optim.lr_scheduler.StepLR(
         config.optimizer, step_size=config.lrstep, gamma=0.99)  
-    best_loss  = np.inf
-    # 1) Build fixed node features once: [x, y, f]
+
+    physics   = config.func_main
+    tol       = physics.bc_tol
+
+    # build static features once
+    graph = physics.graph_modify(graph)
+    
+    # precompute masks and normals for BC & interfaces
     x = graph.pos[:,0:1]
     y = graph.pos[:,1:2]
-    f = (
-    2 * math.pi * torch.cos(math.pi * y) * torch.sin(math.pi * x)
-    + 2 * math.pi * torch.cos(math.pi * x) * torch.sin(math.pi * y)
-    + (x + y) * torch.sin(math.pi * x) * torch.sin(math.pi * y)
-    - 2 * (math.pi ** 2) * (x + y) * torch.sin(math.pi * x) * torch.sin(math.pi * y)
-    )
-    
+    # boundary masks
+    left   = torch.isclose(x, torch.zeros_like(x), atol=tol).squeeze()
+    right  = torch.isclose(x, torch.ones_like(x),  atol=tol).squeeze()
+    bottom = torch.isclose(y, torch.zeros_like(y), atol=tol).squeeze()
+    top    = torch.isclose(y, torch.ones_like(y),  atol=tol).squeeze()
+    neu_mask = (right|top|bottom)                 # Neumann edges
+
+    # normals for those Neumann faces
+    normals = torch.zeros_like(graph.pos)
+    normals[bottom,1] = -1
+    normals[top,1]    = +1
+    normals[right,0]  = +1
+
+    # interface masks and radial normals
+    dx = x - physics.cx;  dy = y - physics.cy
+    r  = torch.sqrt(dx*dx + dy*dy)
+    if1 = ((r > physics.r1 - tol) & (r < physics.r1 + tol)).squeeze()
+    if2 = ((r > physics.r2 - tol) & (r < physics.r2 + tol)).squeeze()
+    rad_normals = torch.zeros_like(graph.pos)
+    rad_normals[if1] = torch.cat([dx[if1]/r[if1], dy[if1]/r[if1]], dim=1)
+    rad_normals[if2] = torch.cat([dx[if2]/r[if2], dy[if2]/r[if2]], dim=1)
     
     for epoch in range(1, config.epchoes + 1):  # Creates different ic and solves the problem, does this epoch # of times
         
-        graph.x = torch.cat([graph.pos, f], dim=-1)  # shape [N,3]
-        u_raw = model(graph)  
+        raw     = model(graph)                           # [N,1]
+        u_hat   = physics._ansatz_u(graph, raw)          # enforce Dirichlet @ x=0
+        r_pde, grad_u = physics.pde_residual(graph, u_hat)
 
-        # 3) Enforce Dirichlet BC = 0 via ansatz (or hard clamp)
-        u = config.bc1(graph, u_raw)
+        # PDE loss
+        loss_pde = torch.mean(r_pde**2)
 
-        # 4) Compute PDE residual: -Δ u + u - f
-        res = config.pde(graph, values_this=u)       # uses laplacian_ad internally
-        loss = torch.norm(res)                       # L2 norm of residual
-    
+        # Neumann‐BC loss: ∂u/∂n = 0 on right,top,bottom
+        dn = (grad_u * normals).sum(dim=1)               # [N]
+        loss_neu = torch.mean(dn[neu_mask]**2)
+
+        # interface‐flux continuity
+        # flux‐jump at r1: (eps1−eps2)*(n·∇u)
+        eps1,eps2,eps3 = physics.eps1,physics.eps2,physics.eps3
+        # mask1
+        n1 = rad_normals[if1]
+        gi = grad_u[if1]
+        jump1 = (eps1-eps2)*(gi * n1).sum(dim=1)
+        loss_if1 = torch.mean(jump1**2) if if1.any() else 0.0
+        # mask2
+        n2 = rad_normals[if2]
+        gj = grad_u[if2]
+        jump2 = (eps2-eps3)*(gj * n2).sum(dim=1)
+        loss_if2 = torch.mean(jump2**2) if if2.any() else 0.0
+
+        loss = ( loss_pde
+               + config.lambda_neu * loss_neu
+               + config.lambda_if  * (loss_if1 + loss_if2)
+               )
+        
         config.optimizer.zero_grad()
         loss.backward(retain_graph=True)
         config.optimizer.step()
@@ -96,22 +136,12 @@ def modelTester(config):
     model = config.model.to(config.device)
     graph = config.graph.to(config.device)
 
-    # 2) Build the fixed node features [x, y, f] exactly as in training
-    x = graph.pos[:, 0:1]
-    y = graph.pos[:, 1:2]
-    f = (
-        2 * math.pi * torch.cos(math.pi * y) * torch.sin(math.pi * x)
-      + 2 * math.pi * torch.cos(math.pi * x) * torch.sin(math.pi * y)
-      + (x + y) * torch.sin(math.pi * x) * torch.sin(math.pi * y)
-      - 2 * (math.pi**2) * (x + y) * torch.sin(math.pi * x) * torch.sin(math.pi * y)
-    )
-    graph.x = torch.cat([x, y, f], dim=-1)
+    physics = config.func_main
 
-    # 3) Forward pass + boundary enforcement
-    u_raw  = model(graph)               # shape [N,1]
-    u_pred = config.bc1(graph, u_raw)   # apply ansatz/hard clamp
-
-    return u_pred.cpu().numpy()
+    graph = physics.graph_modify(graph)
+    raw   = model(graph)                          # [N,1]
+    u     = physics._ansatz_u(graph, raw)         # enforce Dirichlet at x=0
+    return u.cpu().numpy()                        # [N,1] NumPy
 
 
 def compute_steady_error(u_pred, u_exact, config):
