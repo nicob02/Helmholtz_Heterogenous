@@ -68,7 +68,12 @@ def modelTrainer(config):
     rad_normals = torch.zeros_like(graph.pos)
     rad_normals[if1] = torch.cat([dx[if1]/r[if1], dy[if1]/r[if1]], dim=1)
     rad_normals[if2] = torch.cat([dx[if2]/r[if2], dy[if2]/r[if2]], dim=1)
-    
+
+    # boundary masks
+    left   = torch.isclose(x, torch.zeros_like(x), atol=tol).squeeze()
+    right  = torch.isclose(x, torch.ones_like(x),  atol=tol).squeeze()
+    bottom = torch.isclose(y, torch.zeros_like(y), atol=tol).squeeze()
+    top    = torch.isclose(y, torch.ones_like(y),  atol=tol).squeeze()
     bc_mask = (left|right|top|bottom)
     
     # 3) Training loop
