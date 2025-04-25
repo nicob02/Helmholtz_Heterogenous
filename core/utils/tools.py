@@ -105,6 +105,10 @@ def modelTrainer(config):
         #loss_bc  = torch.mean(u_hat[bc_mask]**2)
         #loss = loss_pde + config.lambda_if * (loss_if1 + loss_if2) + config.lambda_dir * loss_bc
         
+        print("if_loss")
+        print(loss_if1 + loss_if2)
+        print("pde_loss")
+        print(loss_pde)
         loss = loss_pde + config.lambda_if * (loss_if1 + loss_if2)
 
         # 4) backward / step
