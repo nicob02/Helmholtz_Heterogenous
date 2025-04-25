@@ -23,34 +23,39 @@ class ElectroThermalFunc():
         self.sigma                  = sigma
         self.bc_tol                 = bc_tol
 
-    def graph_modify(self, graph):
+    
+       def graph_modify(self, graph):
         """
-        Build node features [x, y, eps, k, f].
+        Build node features [x, y, eps(x), k(x), f(x,y)] all of shape [N,1].
         """
-        x = graph.pos[:,0:1]
-        y = graph.pos[:,1:2]
+        x = graph.pos[:, 0:1]   # [N,1]
+        y = graph.pos[:, 1:2]   # [N,1]
         dx = x - self.cx
         dy = y - self.cy
-        r  = torch.sqrt(dx*dx + dy*dy)
+        r  = torch.sqrt(dx*dx + dy*dy)   # [N,1]
 
-        # 1) piecewise eps/k
-        eps = torch.where(r <= self.r1,
-                          self.eps1,
-                   torch.where(r <= self.r2,
-                               self.eps2,
-                               self.eps3)).unsqueeze(1)
-        k   = torch.where(r <= self.r1,
-                          self.k1,
-                   torch.where(r <= self.r2,
-                               self.k2,
-                               self.k3)).unsqueeze(1)
+        # build constant fields of shape [N,1] automatically:
+        E1 = torch.full_like(x, self.eps1)
+        E2 = torch.full_like(x, self.eps2)
+        E3 = torch.full_like(x, self.eps3)
 
-        # 2) Gaussian source term
-        f = torch.exp(-((x-0.5)**2 + (y-0.5)**2) / (2*self.sigma**2))
+        K1 = torch.full_like(x, self.k1)
+        K2 = torch.full_like(x, self.k2)
+        K3 = torch.full_like(x, self.k3)
 
-        # concat into graph.x
-        graph.x = torch.cat([x, y, eps, k, f], dim=-1)
+        # piecewise epsilon and k
+        eps = torch.where(r <= self.r1, E1,
+                  torch.where(r <= self.r2, E2, E3))
+        k   = torch.where(r <= self.r1, K1,
+                  torch.where(r <= self.r2, K2, K3))
+
+        # Gaussian source f(x,y) = exp( -((x-0.5)^2+(y-0.5)^2)/(2σ^2) )
+        f = torch.exp(-((x - 0.5)**2 + (y - 0.5)**2) / (2 * self.sigma**2))
+
+        # now cat: x,y,eps,k,f are all [N,1]
+        graph.x = torch.cat([x, y, eps, k, f], dim=-1)  # → [N,5]
         return graph
+
 
     def _ansatz_u(self, graph, u_raw):
         # no hard Dirichlet any more
