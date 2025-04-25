@@ -55,7 +55,7 @@ class Simulator(nn.Module):
                 nn.init.xavier_uniform_(m.weight)
                 nn.init.uniform_(m.bias, b=0.001)
 
-   def forward(self, graph: Data, **argv):
+    def forward(self, graph: Data, **argv):
         pos = graph.pos.to(self.device)                    # [N,2]
         fourier_feats = self.ff(pos)                       # [N, 2*m]
         
