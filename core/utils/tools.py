@@ -68,7 +68,9 @@ def modelTrainer(config):
     rad_normals = torch.zeros_like(graph.pos)
     rad_normals[if1] = torch.cat([dx[if1]/r[if1], dy[if1]/r[if1]], dim=1)
     rad_normals[if2] = torch.cat([dx[if2]/r[if2], dy[if2]/r[if2]], dim=1)
-
+    
+    bc_mask = (left|right|top|bottom)
+    
     # 3) Training loop
     for epoch in range(1, config.epchoes+1):
         raw   = model(graph)                     # [N,1]
@@ -95,6 +97,9 @@ def modelTrainer(config):
         jump2   = (eps2 - eps3) * (gj * n2).sum(dim=1)
         loss_if2 = torch.mean(jump2**2) if if2.any() else 0.0
 
+        #loss_bc  = torch.mean(u_hat[bc_mask]**2)
+        #loss = loss_pde + config.lambda_if * (loss_if1 + loss_if2) + config.lambda_dir * loss_bc
+        
         loss = loss_pde + config.lambda_if * (loss_if1 + loss_if2)
 
         # 4) backward / step
