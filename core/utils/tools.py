@@ -87,7 +87,7 @@ def modelTrainer(config):
         r_pde, grad_u = physics.pde_residual(graph, u)
 
         # PDE loss
-        Lpde = torch.mean( (r_pde[interior_mask])**2 )
+        loss_pde = torch.mean( (r_pde[interior_mask])**2 )
         
         # 2) Dirichlet left‐face penalty
         u_left = u[left]                     # [#left,1]
