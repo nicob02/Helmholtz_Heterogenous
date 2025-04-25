@@ -5,35 +5,74 @@ from torch_geometric.data import Data
 from core.utils.gnnutils import copy_geometric_data
 import os
 
+import torch
+import torch.nn as nn
+from torch_geometric.data import Data
+from .model import EncoderProcesserDecoder
+from .utils.fourier_features import FourierFeatures
+
 class Simulator(nn.Module):
 
-    def __init__(self, message_passing_num, node_input_size, edge_input_size, 
-                 ndim, device, model_dir='checkpoint/simulator.pth') -> None:
-        super(Simulator, self).__init__()
+    def __init__(self,
+                 message_passing_num: int,
+                 node_input_size: int,
+                 edge_input_size: int,
+                 ndim: int,
+                 device,
+                 fourier_mapping_size: int = 64,
+                 fourier_scale: float = 10.0,
+                 model_dir: str = 'checkpoint/simulator.pth',
+                ) -> None:
+        super().__init__()
 
-        self.node_input_size =  node_input_size
-        self.edge_input_size = edge_input_size
+        # 1) build Fourier front‐end
+        self.ff = FourierFeatures(
+            in_dim=2,
+            mapping_size=fourier_mapping_size,
+            scale=fourier_scale
+        ).to(device)
+
+        # 2) adjust node_input_size:
+        #    we remove the two raw [x,y] dims and replace them by 2*m Fourier dims
+        ff_dim = 2 * fourier_mapping_size
+        other_node_dims = node_input_size - 2
+        new_node_input_size = ff_dim + other_node_dims
+
+        # 3) instantiate your GNN
+        self.model = EncoderProcesserDecoder(
+            message_passing_num=message_passing_num,
+            node_input_size=new_node_input_size,
+            edge_input_size=edge_input_size,
+            ndim=ndim
+        ).to(device)
+
         self.model_dir = model_dir
-        self.ndim = ndim
-        self.model = EncoderProcesserDecoder(message_passing_num=message_passing_num, 
-                                             node_input_size=node_input_size,
-                                             edge_input_size=edge_input_size, 
-                                             ndim=ndim).to(device)
+        self.device    = device
 
-        self.device = device
-    
     def init_weight(self):
         for m in self.modules():
             if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
-                nn.init.uniform_(m.bias.data, b=0.001)
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.uniform_(m.bias, b=0.001)
 
+    def forward(self, graph: Data, **argv):
+        # graph.pos: [N,2]
+        pos = graph.pos.to(self.device)
 
-    def forward(self, graph:Data, **argv):
-        
+        # 1) compute Fourier features from the raw positions
+        fourier_feats = self.ff(pos)                # [N, 2*m]
+
+        # 2) grab the rest of the node features (everything except raw x,y)
+        #    we assume graph.x was built earlier to be [x,y,...other physics dims...]
+        #    so we drop [:,:2] and keep [:,2:]
+        other_feats = graph.x.to(self.device)[:, 2:]  # [N, other_node_dims]
+
+        # 3) splice them together
+        graph.x = torch.cat([fourier_feats, other_feats], dim=-1)
+
+        # 4) run through your GNN
         predicted = self.model(graph)  
         predicted.requires_grad_() 
-        
         return predicted
     
     def save_model(self, optimizer=None):
