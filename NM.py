@@ -7,7 +7,7 @@ from fenics import (
     Point, FunctionSpace, TrialFunction, TestFunction, Function,
     Constant, DirichletBC, solve, dx, dot, grad
 )
-from ufl import conditional, le, SpatialCoordinate
+from ufl import conditional, le, SpatialCoordinate, exp
 import numpy as np
 
 def run_fem(electrode_mesh, coords=None, r1=0.15, r2=0.30, eps1=4.0, eps2=2.0, eps3=1.0, k1=20.0, k2=10.0, k3=5.0):
