@@ -58,7 +58,7 @@ class ElectroThermalFunc():
             + (x + y) * torch.sin(math.pi * x) * torch.sin(math.pi * y)
             - 2 * (math.pi ** 2) * (x + y) * torch.sin(math.pi * x) * torch.sin(math.pi * y)
         )
-       # f = f_raw / (f_raw.abs().max() + 1e-16)
+        f = f / (f.abs().max() + 1e-16)
         
         # now cat: x,y,eps,k,f are all [N,1]
         graph.x = torch.cat([x, y, eps, k, f], dim=-1)  # → [N,5]
