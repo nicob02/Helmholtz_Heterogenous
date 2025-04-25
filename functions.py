@@ -49,10 +49,13 @@ class ElectroThermalFunc():
         Hard Dirichlet on x=0 (“incoming plane wave” u=cos(k3 x))
         G(x)=cos(k3 x), D(x)=tanh(pi x) so that u(0)=G(0)=1.
         """
-        x = graph.pos[:,0:1]
-        G = torch.cos(self.k3 * x)
-        D = torch.tanh(math.pi * x)
-        return G + D * u_raw
+        u_hat = u_raw.clone()
+        x = graph.pos[:,0]
+        left = torch.isclose(x, torch.zeros_like(x), atol=self.bc_tol)
+        u_hat[left] = 1.0       # exactly 1 on the left boundary
+        
+        return u_hat
+
 
     def pde_residual(self, graph, u):
         """
