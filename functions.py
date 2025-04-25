@@ -56,42 +56,52 @@ class ElectroThermalFunc():
         return graph
 
 
-    def _ansatz_u(self, graph, u_raw):
-        # no hard Dirichlet any more
-        return u_raw
+    def _ansatz_u(self, graph, u_raw):}
+        
+        x, y = graph.pos[:,0:1], graph.pos[:,1:2]
+        # Distance factor D(x,y) that vanishes exactly on ALL four edges:
+        D = ( torch.tanh(math.pi * x) 
+            * torch.tanh(math.pi * (1.0 - x))
+            * torch.tanh(math.pi * y)
+            * torch.tanh(math.pi * (1.0 - y)) )
+        # G(x,y) = 0 everywhere on boundary:
+        G = torch.zeros_like(x)
+        return G + D * u_raw
 
     def pde_residual(self, graph, u):
         """
-        Now re-use graph.x[:,4] for f instead of recomputing it.
+        Compute
+           r_pde = div( eps * grad u ) + k^2 u - f
+        at each node, returning (r_pde, grad_u).
         """
         pos = graph.pos
-        # extract eps,k,f from the features
-        eps = graph.x[:,2:3]
-        k   = graph.x[:,3:4]
-        f   = graph.x[:,4:5]
+        eps = graph.x[:, 2:3]    # [N,1]
+        k   = graph.x[:, 3:4]    # [N,1]
+        f   = graph.x[:, 4:5]    # [N,1]
 
-        # compute grad u
+        # 1) ∇u  → grad_u [N,2]
         grad_u = torch.autograd.grad(
-            outputs=u, inputs=pos,
+            outputs=u,
+            inputs=pos,
             grad_outputs=torch.ones_like(u),
             create_graph=True
-        )[0]                          # [N,2]
+        )[0]
 
-        # flux = eps * grad_u
-        flux = eps * grad_u           # [N,2]
+        # 2) flux = ε ∇u
+        flux = eps * grad_u       # [N,2]
 
-        # divergence
+        # 3) divergence of flux
         div = torch.zeros_like(u)
-        for i in range(2):
-            di = torch.autograd.grad(
-                outputs=flux[:,i:i+1],
+        for d in range(2):
+            div_d = torch.autograd.grad(
+                outputs=flux[:, d:d+1],
                 inputs=pos,
-                grad_outputs=torch.ones_like(flux[:,i:i+1]),
+                grad_outputs=torch.ones_like(flux[:, d:d+1]),
                 create_graph=True
-            )[0][:,i:i+1]
-            div = div + di
+            )[0][:, d:d+1]
+            div = div + div_d
 
-        # residual = div(eps grad u) + k^2 u - f
+        # 4) PDE residual
         r_pde = div + (k**2)*u - f
 
         return r_pde, grad_u
