@@ -90,10 +90,7 @@ def modelTrainer(config):
         r_pde, grad_u = physics.pde_residual(graph, u_hat)  # r_pde [N,1], grad_u [N,2]
 
         loss_pde = torch.mean((r_pde[interior_mask])**2 )
-        
-        # 2) Dirichlet left‐face penalty
-        u_left = u[left]                     # [#left,1]
-        loss_dir   = torch.mean( (u_left - 1.0)**2 )
+    
 
         # Neumann‐BC loss: ∂u/∂n = 0 on right,top,bottom
         dn = (grad_u * normals).sum(dim=1)               # [N]
