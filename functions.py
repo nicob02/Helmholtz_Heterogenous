@@ -48,8 +48,17 @@ class ElectroThermalFunc():
         k   = torch.where(r <= self.r1, K1,
                   torch.where(r <= self.r2, K2, K3))
         
-        # Gaussian source f(x,y) = exp( -((x-0.5)^2+(y-0.5)^2)/(2σ^2) )
-        f = torch.exp(-((x - 0.5)**2 + (y - 0.5)**2) / (2 * self.sigma**2))
+        # f(x,y) = 2π cos(πy) sin(πx)
+        #         + 2π cos(πx) sin(πy)
+        #         + (x+y) sin(πx) sin(πy)
+        #         - 2π² (x+y) sin(πx) sin(πy)
+        f = (
+            2 * math.pi * torch.cos(math.pi * y) * torch.sin(math.pi * x)
+            + 2 * math.pi * torch.cos(math.pi * x) * torch.sin(math.pi * y)
+            + (x + y) * torch.sin(math.pi * x) * torch.sin(math.pi * y)
+            - 2 * (math.pi ** 2) * (x + y) * torch.sin(math.pi * x) * torch.sin(math.pi * y)
+        )
+
         
         # now cat: x,y,eps,k,f are all [N,1]
         graph.x = torch.cat([x, y, eps, k, f], dim=-1)  # → [N,5]
