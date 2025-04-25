@@ -83,12 +83,15 @@ def modelTrainer(config):
     
     for epoch in range(1, config.epchoes + 1):  # Creates different ic and solves the problem, does this epoch # of times
         
-        raw     = model(graph)                           # [N,1]
-        u_hat   = physics._ansatz_u(graph, raw)          # enforce Dirichlet @ x=0
-        r_pde, grad_u = physics.pde_residual(graph, u_hat)
+        u     = model(graph)                           # [N,1]
+        r_pde, grad_u = physics.pde_residual(graph, u)
 
         # PDE loss
         loss_pde = torch.mean(r_pde**2)
+        
+        # 2) Dirichlet left‐face penalty
+        u_left = u[left]                     # [#left,1]
+        Ldir   = torch.mean( (u_left - 1.0)**2 )
 
         # Neumann‐BC loss: ∂u/∂n = 0 on right,top,bottom
         dn = (grad_u * normals).sum(dim=1)               # [N]
@@ -108,9 +111,7 @@ def modelTrainer(config):
         jump2 = (eps2-eps3)*(gj * n2).sum(dim=1)
         loss_if2 = torch.mean(jump2**2) if if2.any() else 0.0
 
-        loss = ( loss_pde
-               + config.lambda_neu * loss_neu
-               + config.lambda_if  * (loss_if1 + loss_if2)
+        loss = ( loss_pde + confg.lamda_dir * L_dir + config.lambda_neu * loss_neu + config.lambda_if  * (loss_if1 + loss_if2)
                )
         
         config.optimizer.zero_grad()
@@ -140,8 +141,7 @@ def modelTester(config):
 
     graph = physics.graph_modify(graph)
     raw   = model(graph)                          # [N,1]
-    u     = physics._ansatz_u(graph, raw)         # enforce Dirichlet at x=0
-    return u.cpu().numpy()                        # [N,1] NumPy
+    return raw.cpu().numpy()                        # [N,1] NumPy
 
 
 def compute_steady_error(u_pred, u_exact, config):
