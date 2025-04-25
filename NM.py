@@ -26,7 +26,7 @@ def run_fem(electrode_mesh, coords=None, r1=0.15, r2=0.30, eps1=4.0, eps2=2.0, e
     mesh = electrode_mesh.mesh
 
     # 2) scalar P1 space
-    V_space = FunctionSpace(mesh, 'CG', 1)
+    V_space = FunctionSpace(mesh, 'CG', 2)
 
     # 3) define trial/test
     u = TrialFunction(V_space)
