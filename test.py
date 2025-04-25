@@ -32,12 +32,16 @@ mapping_size = 64
 node_input_size = 2*mapping_size + 3  # = 131
 edge_input_size = 3                    # however many edge features you have
 
-model = msgPassing(
-    message_passing_num=3,             # start with 3 MP layers; you can try 5 once it’s stable
-    node_input_size=node_input_size,
-    edge_input_size=edge_input_size,
-    ndim=out_ndim,                     # your desired output dim (e.g. 1 or 2)
+raw_node_input_size = 5  
+
+model = Simulator(
+    message_passing_num=3,
+    node_input_size=raw_node_input_size,   # <<— 5, not 131
+    edge_input_size=3,
+    ndim=out_ndim,
     device=device,
+    fourier_mapping_size=64,
+    fourier_scale=10.0,
     model_dir=ckptpath
 )
 model.load_model(ckptpath)
