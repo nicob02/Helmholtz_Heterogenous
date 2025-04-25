@@ -28,8 +28,18 @@ func_main = Func(eps=(4.0,2.0,1.0),
 
 mesh = ElectrodeMesh(ru=(1, 1), lb=(0, 0), density=65)
 graph = mesh.getGraphData()
-model = msgPassing(message_passing_num=5, node_input_size=out_ndim+4, 
-                   edge_input_size=3, ndim=out_ndim, device=device, model_dir=ckptpath)
+mapping_size = 64
+node_input_size = 2*mapping_size + 3  # = 131
+edge_input_size = 3                    # however many edge features you have
+
+model = msgPassing(
+    message_passing_num=3,             # start with 3 MP layers; you can try 5 once it’s stable
+    node_input_size=node_input_size,
+    edge_input_size=edge_input_size,
+    ndim=out_ndim,                     # your desired output dim (e.g. 1 or 2)
+    device=device,
+    model_dir=ckptpath
+)
 model.load_model(ckptpath)
 model.to(device)
 model.eval()
