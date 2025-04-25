@@ -7,7 +7,7 @@ from fenics import (
     Point, FunctionSpace, TrialFunction, TestFunction, Function,
     Constant, DirichletBC, solve, dx, dot, grad
 )
-from ufl import conditional, le
+from ufl import conditional, le, SpatialCoordinate
 import numpy as np
 
 def run_fem(electrode_mesh, coords=None, r1=0.15, r2=0.30, eps1=4.0, eps2=2.0, eps3=1.0, k1=20.0, k2=10.0, k3=5.0):
@@ -33,10 +33,8 @@ def run_fem(electrode_mesh, coords=None, r1=0.15, r2=0.30, eps1=4.0, eps2=2.0, e
     v = TestFunction(V_space)
 
     # 4) build pointwise expressions for ε(x), k(x)
-    x, y = mesh.coordinates().T
-    # but for UFL we use spatial coords symbolically:
-    X = V_space.mesh().ufl_domain().ufl_coordinate_domain()  # sequence of spatial coords
-    # instead, directly use conditional in UFL:
+    # Use UFL's SpatialCoordinate to get (x,y) symbolically:
+    X = SpatialCoordinate(mesh)   # now X[0] is the x‐coordinate, X[1] is y
     # r^2 = (x-0.5)^2 + (y-0.5)^2
     # but in FEniCS, you write x[0], x[1]:
     eps = conditional(
