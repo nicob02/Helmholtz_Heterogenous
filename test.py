@@ -46,7 +46,8 @@ setattr(test_config, 'graph_modify', func_main.graph_modify)
 setattr(test_config, 'graph', graph)
 setattr(test_config, 'density', dens)
 setattr(test_config, 'func_main', func_main)
-      
+setattr(test_config, 'lambda_neu', 1.0) 
+setattr(test_config, 'lambda_if', 1.0)      
 
 #-----------------------------------------
 
