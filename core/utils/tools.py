@@ -65,7 +65,7 @@ def modelTrainer(config):
     bottom = torch.isclose(y, torch.zeros_like(y), atol=tol).squeeze()
     top    = torch.isclose(y, torch.ones_like(y),  atol=tol).squeeze()
     neu_mask = (right|top|bottom)                 # Neumann edges
-
+    interior_mask = ~(left | right | bottom | top)   # for PDE
     # normals for those Neumann faces
     normals = torch.zeros_like(graph.pos)
     normals[bottom,1] = -1
@@ -87,7 +87,7 @@ def modelTrainer(config):
         r_pde, grad_u = physics.pde_residual(graph, u)
 
         # PDE loss
-        loss_pde = torch.mean(r_pde**2)
+        Lpde = torch.mean( (r_pde[interior_mask])**2 )
         
         # 2) Dirichlet left‐face penalty
         u_left = u[left]                     # [#left,1]
