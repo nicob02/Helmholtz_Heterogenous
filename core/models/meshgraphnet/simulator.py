@@ -55,24 +55,23 @@ class Simulator(nn.Module):
                 nn.init.xavier_uniform_(m.weight)
                 nn.init.uniform_(m.bias, b=0.001)
 
-    def forward(self, graph: Data, **argv):
-        # graph.pos: [N,2]
-        pos = graph.pos.to(self.device)
-
-        # 1) compute Fourier features from the raw positions
-        fourier_feats = self.ff(pos)                # [N, 2*m]
-
-        # 2) grab the rest of the node features (everything except raw x,y)
-        #    we assume graph.x was built earlier to be [x,y,...other physics dims...]
-        #    so we drop [:,:2] and keep [:,2:]
-        other_feats = graph.x.to(self.device)[:, 2:]  # [N, other_node_dims]
-
-        # 3) splice them together
-        graph.x = torch.cat([fourier_feats, other_feats], dim=-1)
-
-        # 4) run through your GNN
-        predicted = self.model(graph)  
-        predicted.requires_grad_() 
+   def forward(self, graph: Data, **argv):
+        pos = graph.pos.to(self.device)                    # [N,2]
+        fourier_feats = self.ff(pos)                       # [N, 2*m]
+        
+        raw_feats   = graph.x.to(self.device)              # [N, raw_dims]
+        other_feats = raw_feats[:, 2:]                     # drop x,y → [N, raw_dims-2]
+        
+        # build the combined node‐feature tensor
+        combined = torch.cat([fourier_feats, other_feats], dim=-1)  # [N, 2*m + (raw_dims-2)]
+        
+        # clone the graph, attach new features, leave original untouched
+        g2 = copy_geometric_data(graph)
+        g2.x = combined
+        
+        # now pass _that_ into your GNN
+        predicted = self.model(g2)
+        predicted.requires_grad_()
         return predicted
     
     def save_model(self, optimizer=None):
