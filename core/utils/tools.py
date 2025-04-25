@@ -65,7 +65,7 @@ def modelTrainer(config):
     bottom = torch.isclose(y, torch.zeros_like(y), atol=tol).squeeze()
     top    = torch.isclose(y, torch.ones_like(y),  atol=tol).squeeze()
     neu_mask = (right|top|bottom)                 # Neumann edges
-    interior_mask = ~(left | right | bottom | top)   # for PDE
+    interior_mask = ~left 
     # normals for those Neumann faces
     normals = torch.zeros_like(graph.pos)
     normals[bottom,1] = -1
@@ -83,10 +83,12 @@ def modelTrainer(config):
     
     for epoch in range(1, config.epchoes + 1):  # Creates different ic and solves the problem, does this epoch # of times
         
-        u     = model(graph)                           # [N,1]
-        r_pde, grad_u = physics.pde_residual(graph, u)
+        raw   = model(graph)                         # [N,1]
+        u_hat = physics._ansatz_u(graph, raw)        # hard‐enforce u(0)=1
 
-        # PDE loss
+        # PDE residual + gradients
+        r_pde, grad_u = physics.pde_residual(graph, u_hat)  # r_pde [N,1], grad_u [N,2]
+
         loss_pde = torch.mean((r_pde[interior_mask])**2 )
         
         # 2) Dirichlet left‐face penalty
@@ -111,7 +113,7 @@ def modelTrainer(config):
         jump2 = (eps2-eps3)*(gj * n2).sum(dim=1)
         loss_if2 = torch.mean(jump2**2) if if2.any() else 0.0
 
-        loss = ( loss_pde + config.lambda_dir * loss_dir + config.lambda_neu * loss_neu + config.lambda_if  * (loss_if1 + loss_if2))
+        loss = ( loss_pde + config.lambda_neu * loss_neu + config.lambda_if  * (loss_if1 + loss_if2))
         
         config.optimizer.zero_grad()
         loss.backward(retain_graph=True)
