@@ -61,7 +61,7 @@ x, y   = pos_np[:,0], pos_np[:,1]
 coords_fem, V_vals_fem = run_fem(electrode_mesh=mesh, coords=graph.pos.cpu().numpy()) 
 
 # 3) Compute and print relative L2 errors
-err_V = compute_steady_error(predicted_results, V_vals_fem)
+err_V = compute_steady_error(predicted_results, V_vals_fem, test_config)
 print(f"Rel L2 error Voltage:     {err_V:.3e}")
 
 render_results(predicted_results, V_vals_fem, graph, filename="NNvsFEM.png")
