@@ -56,7 +56,7 @@ class ElectroThermalFunc():
         return graph
 
 
-    def _ansatz_u(self, graph, u_raw):}
+    def _ansatz_u(self, graph, u_raw):
         
         x, y = graph.pos[:,0:1], graph.pos[:,1:2]
         # Distance factor D(x,y) that vanishes exactly on ALL four edges:
