@@ -7,22 +7,25 @@ import math
 class ElectroThermalFunc(): 
 
     func_name = 'Helmholtz_Heterogenous'
-    def __init__(self,
-                 eps=(4.0, 2.0, 1.0),
-                 k  =(20.0,10.0, 5.0),
-                 center=(0.5,0.5),
-                 r1=0.15,
-                 r2=0.30,
-                 bc_tol=1e-3):
+    def __init__(
+        self,
+        eps=(4.0,2.0,1.0),
+        k=(20.0,10.0,5.0),
+        center=(0.5,0.5),
+        r1=0.15, r2=0.30,
+        sigma=0.05,
+        bc_tol=1e-3
+    ):
         self.eps1,self.eps2,self.eps3 = eps
         self.k1,  self.k2,  self.k3   = k
         self.cx,  self.cy            = center
         self.r1,  self.r2            = r1, r2
-        self.bc_tol                  = bc_tol
+        self.sigma                  = sigma
+        self.bc_tol                 = bc_tol
 
     def graph_modify(self, graph):
         """
-        Build node features [x, y, eps(x), k(x)].
+        Build node features [x, y, eps, k, f].
         """
         x = graph.pos[:,0:1]
         y = graph.pos[:,1:2]
@@ -30,79 +33,61 @@ class ElectroThermalFunc():
         dy = y - self.cy
         r  = torch.sqrt(dx*dx + dy*dy)
 
+        # 1) piecewise eps/k
         eps = torch.where(r <= self.r1,
                           self.eps1,
                    torch.where(r <= self.r2,
                                self.eps2,
-                               self.eps3))
+                               self.eps3)).unsqueeze(1)
         k   = torch.where(r <= self.r1,
                           self.k1,
                    torch.where(r <= self.r2,
                                self.k2,
-                               self.k3))
+                               self.k3)).unsqueeze(1)
 
-        graph.x = torch.cat([x, y, eps, k], dim=-1)   # all are [N,1]
+        # 2) Gaussian source term
+        f = torch.exp(-((x-0.5)**2 + (y-0.5)**2) / (2*self.sigma**2))
+
+        # concat into graph.x
+        graph.x = torch.cat([x, y, eps, k, f], dim=-1)
         return graph
 
     def _ansatz_u(self, graph, u_raw):
-        """
-        Enforce u(0,y)=1 exactly on the left face x=0.
+        # no hard Dirichlet any more
+        return u_raw
 
-        G(x) := cos(k3 * x)    → at x=0, G(0)=1
-        D(x) := tanh(pi * x)   → at x=0, D(0)=0
-
-        Then u_hat = G + D * u_raw satisfies u_hat(0)=1, no matter what u_raw is.
-        """
-        # extract x coordinate → shape [N,1]
-        x = graph.pos[:, 0:1]
-
-        # the “extension” G(x) that equals the correct boundary value at x=0
-        G = torch.cos(self.k3 * x)
-
-        # the “distance” D(x) that vanishes at x=0, grows into the interior
-        D = torch.tanh(math.pi * x)
-
-        # combine
-        return G + D * u_raw
-        
     def pde_residual(self, graph, u):
         """
-        Computes (div(eps * grad u) + k^2 u) at every node.
-        Returns
-          r_pde  [N,1],  grad_u [N,2]
+        Now re-use graph.x[:,4] for f instead of recomputing it.
         """
         pos = graph.pos
+        # extract eps,k,f from the features
         eps = graph.x[:,2:3]
         k   = graph.x[:,3:4]
+        f   = graph.x[:,4:5]
 
-        # ∇u
+        # compute grad u
         grad_u = torch.autograd.grad(
-            outputs=u,
-            inputs=pos,
+            outputs=u, inputs=pos,
             grad_outputs=torch.ones_like(u),
-            create_graph=True,
-        )[0]                                         # [N,2]
+            create_graph=True
+        )[0]                          # [N,2]
 
-        # flux = eps * ∇u
-        flux = eps * grad_u                          # [N,2]
+        # flux = eps * grad_u
+        flux = eps * grad_u           # [N,2]
 
-        # div flux
+        # divergence
         div = torch.zeros_like(u)
         for i in range(2):
             di = torch.autograd.grad(
                 outputs=flux[:,i:i+1],
                 inputs=pos,
                 grad_outputs=torch.ones_like(flux[:,i:i+1]),
-                create_graph=True,
+                create_graph=True
             )[0][:,i:i+1]
             div = div + di
 
-        # PDE residual = div(eps grad u) + k^2 u   (f=0)
-        r_pde = div + (k**2)*u
+        # residual = div(eps grad u) + k^2 u - f
+        r_pde = div + (k**2)*u - f
+
         return r_pde, grad_u
-
-    
-    
-
-    
-    
