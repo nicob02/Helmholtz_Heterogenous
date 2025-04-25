@@ -46,17 +46,25 @@ class ElectroThermalFunc():
 
     def _ansatz_u(self, graph, u_raw):
         """
-        Hard Dirichlet on x=0 (“incoming plane wave” u=cos(k3 x))
-        G(x)=cos(k3 x), D(x)=tanh(pi x) so that u(0)=G(0)=1.
+        Enforce u(0,y)=1 exactly on the left face x=0.
+
+        G(x) := cos(k3 * x)    → at x=0, G(0)=1
+        D(x) := tanh(pi * x)   → at x=0, D(0)=0
+
+        Then u_hat = G + D * u_raw satisfies u_hat(0)=1, no matter what u_raw is.
         """
-        u_hat = u_raw.clone()
-        x = graph.pos[:,0]
-        left = torch.isclose(x, torch.zeros_like(x), atol=self.bc_tol)
-        u_hat[left] = 1.0       # exactly 1 on the left boundary
+        # extract x coordinate → shape [N,1]
+        x = graph.pos[:, 0:1]
+
+        # the “extension” G(x) that equals the correct boundary value at x=0
+        G = torch.cos(self.k3 * x)
+
+        # the “distance” D(x) that vanishes at x=0, grows into the interior
+        D = torch.tanh(math.pi * x)
+
+        # combine
+        return G + D * u_raw
         
-        return u_hat
-
-
     def pde_residual(self, graph, u):
         """
         Computes (div(eps * grad u) + k^2 u) at every node.
