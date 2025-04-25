@@ -6,7 +6,8 @@ from core.geometry import ElectrodeMesh
 from functions import ElectroThermalFunc as Func
 import os
 import matplotlib.pyplot as plt
-
+from NM import run_fem 
+from torch_geometric.data import Data
 
 
 
