@@ -20,8 +20,18 @@ func_main = Func(eps=(4.0,2.0,1.0),
     bc_tol=1e-3
 )
 
-model = msgPassing(message_passing_num=5, node_input_size=out_ndim+4, edge_input_size=3, 
-                   ndim=out_ndim, device=device, model_dir=ckptpath)    # Mess with MPN# to 2 or 3, +3 comes from source + BC
+mapping_size = 64
+node_input_size = 2*mapping_size + 3  # = 131
+edge_input_size = 3                    # however many edge features you have
+
+model = msgPassing(
+    message_passing_num=3,             # start with 3 MP layers; you can try 5 once it’s stable
+    node_input_size=node_input_size,
+    edge_input_size=edge_input_size,
+    ndim=out_ndim,                     # your desired output dim (e.g. 1 or 2)
+    device=device,
+    model_dir=ckptpath
+)
 model.to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
 
@@ -80,7 +90,7 @@ setattr(train_config, 'graph', graph)
 setattr(train_config, 'model', model)
 setattr(train_config, 'optimizer', optimizer)
 setattr(train_config, 'train_steps', 1)    # 1 train step, extend this in the future to a dynamic source function that changes with time.
-setattr(train_config, 'epchoes', 1500)
+setattr(train_config, 'epchoes', 3000)
 setattr(train_config, 'NodeTypesRef', ElectrodeMesh.node_type_ref) 
 setattr(train_config, 'step_times', 1)
 setattr(train_config, 'ndim', out_ndim)
