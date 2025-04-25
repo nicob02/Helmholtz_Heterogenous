@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 from torch_geometric.data import Data
 from .model import EncoderProcesserDecoder
-from .utils.fourier_features import FourierFeatures
+from core.utils.fourier_features import FourierFeatures
 
 class Simulator(nn.Module):
 
