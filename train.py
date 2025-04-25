@@ -26,7 +26,7 @@ edge_input_size = 3                    # however many edge features you have
 
 raw_node_input_size = 5  
 
-model = Simulator(
+model = msgPassing(
     message_passing_num=3,
     node_input_size=raw_node_input_size,   # <<— 5, not 131
     edge_input_size=3,
