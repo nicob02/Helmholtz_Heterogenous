@@ -41,7 +41,7 @@ class ElectroThermalFunc():
                                self.k2,
                                self.k3))
 
-        graph.x = torch.cat([x, y, eps.unsqueeze(1), k.unsqueeze(1)], dim=-1)
+        graph.x = torch.cat([x, y, eps, k], dim=-1)   # all are [N,1]
         return graph
 
     def _ansatz_u(self, graph, u_raw):
