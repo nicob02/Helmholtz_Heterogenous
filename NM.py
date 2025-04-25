@@ -12,70 +12,43 @@ import numpy as np
 
 def run_fem(electrode_mesh, coords=None, r1=0.15, r2=0.30, eps1=4.0, eps2=2.0, eps3=1.0, k1=20.0, k2=10.0, k3=5.0):
     """
-    Solve ∇·(ε(x)∇u) + k(x)^2 u = 0 on the unit square with two concentric
-    circular inclusions of radius r1,r2, piecewise-constant ε,k.
-    Dirichlet u=1 on x=0; Neumann (natural) elsewhere.
-
-    Input:
-      electrode_mesh: an ElectrodeMesh() instance, whose .mesh is a dolfin.Mesh
-    Returns:
-      coords  : numpy array [N,2] of the same node positions as GNN
-      VV      : numpy array [N] of finite‐element u at each node
+    Solve ∇·(ε∇u) + k^2 u = f  on the unit square with
+    two concentric inclusions, *all*-Neumann boundary,
+    and Gaussian source f.
     """
-    # 1) pull out the underlying dolfin mesh
     mesh = electrode_mesh.mesh
+    V_space = FunctionSpace(mesh, 'CG', 1)
 
-    # 2) scalar P1 space
-    V_space = FunctionSpace(mesh, 'CG', 2)
-
-    # 3) define trial/test
     u = TrialFunction(V_space)
     v = TestFunction(V_space)
 
-    # 4) build pointwise expressions for ε(x), k(x)
-    # Use UFL's SpatialCoordinate to get (x,y) symbolically:
-    X = SpatialCoordinate(mesh)   # now X[0] is the x‐coordinate, X[1] is y
-    # r^2 = (x-0.5)^2 + (y-0.5)^2
-    # but in FEniCS, you write x[0], x[1]:
+    X = SpatialCoordinate(mesh)
+    r2sym = (X[0]-0.5)**2 + (X[1]-0.5)**2
+
+    # piecewise eps/k
     eps = conditional(
-        le((X[0]-0.5)**2 + (X[1]-0.5)**2, r1**2),
-        Constant(eps1),
-        conditional(
-            le((X[0]-0.5)**2 + (X[1]-0.5)**2, r2**2),
-            Constant(eps2),
-            Constant(eps3)
-        )
+        le(r2sym, r1**2), Constant(eps1),
+        conditional(le(r2sym, r2**2), Constant(eps2), Constant(eps3))
     )
     kk = conditional(
-        le((X[0]-0.5)**2 + (X[1]-0.5)**2, r1**2),
-        Constant(k1),
-        conditional(
-            le((X[0]-0.5)**2 + (X[1]-0.5)**2, r2**2),
-            Constant(k2),
-            Constant(k3)
-        )
+        le(r2sym, r1**2), Constant(k1),
+        conditional(le(r2sym, r2**2), Constant(k2), Constant(k3))
     )
 
-    # 5) weak form: ∫ ε ∇u·∇v dx  - ∫ k^2 u v dx = 0
-    a = dot(eps*grad(u), grad(v))*dx - kk**2 * u*v*dx
-    L = Constant(0.0)*v*dx
+    # Gaussian source
+    f_expr = exp(-r2sym/(2*sigma**2))
 
-    # 6) Dirichlet on x=0: u=1
-    def left_boundary(x_, on_bnd):
-        return on_bnd and abs(x_[0]) < 1e-8
-    bc = DirichletBC(V_space, Constant(1.0), left_boundary)
+    # weak form
+    a = dot(eps*grad(u), grad(v))*dx + kk**2 * u*v*dx
+    L = f_expr*v*dx
 
-    # 7) solve
+    # solve with pure Neumann: no DirichletBC at all
     U = Function(V_space)
-    solve(a == L, U, bc)
+    solve(a == L, U)
 
-    # 8) now sample at the same coords as graph.pos
-    VV = np.empty((coords.shape[0],), float)
-    pt = Point(0.0, 0.0)                   # reusable Point object
-    for i, (xi, yi) in enumerate(coords):  
-        # rebuild a fresh Point for each (xi,yi)
-        p = Point(float(xi), float(yi))
-        VV[i] = U(p)
-
+    # sample at GNN nodes
+    VV = np.empty((coords.shape[0],), dtype=np.float64)
+    for i,(xi,yi) in enumerate(coords):
+        VV[i] = U(Point(float(xi),float(yi)))
 
     return coords, VV
