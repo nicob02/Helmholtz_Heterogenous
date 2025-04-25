@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from core.geometry import ElectrodeMesh
 from fenics import (
     Point, FunctionSpace, TrialFunction, TestFunction, Function,
-    Constant, DirichletBC, solve, dx, dot, grad
+    Constant, DirichletBC, solve, dx, dot, grad, near
 )
 from ufl import conditional, le, SpatialCoordinate, exp
 import numpy as np
