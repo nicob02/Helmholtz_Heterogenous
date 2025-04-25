@@ -43,36 +43,33 @@ def parse_config(file='config.json'):
     return configs[k]
 
 
+
 def modelTrainer(config):
-    
-    model = config.model
-    graph = config.graph
-    scheduler = torch.optim.lr_scheduler.StepLR(
-        config.optimizer, step_size=config.lrstep, gamma=0.99)  
+    model   = config.model
+    graph   = config.graph
+    physics = config.func_main
+    opt     = config.optimizer
+    sched   = torch.optim.lr_scheduler.StepLR(opt, step_size=config.lrstep, gamma=0.99)
+    tol     = physics.bc_tol
 
-    physics   = config.func_main
-    tol       = physics.bc_tol
-
-    # build static features once
+    # 1) fixed node features
     graph = physics.graph_modify(graph)
-    
-    # precompute masks and normals for BC & interfaces
-    x = graph.pos[:,0:1]
-    y = graph.pos[:,1:2]
-    # boundary masks
+
+    # 2) identify boundary masks & normals for Neumann on all edges
+    x = graph.pos[:,0:1];  y = graph.pos[:,1:2]
     left   = torch.isclose(x, torch.zeros_like(x), atol=tol).squeeze()
     right  = torch.isclose(x, torch.ones_like(x),  atol=tol).squeeze()
     bottom = torch.isclose(y, torch.zeros_like(y), atol=tol).squeeze()
     top    = torch.isclose(y, torch.ones_like(y),  atol=tol).squeeze()
-    neu_mask = (right|top|bottom)                 # Neumann edges
-    interior_mask = ~left 
-    # normals for those Neumann faces
-    normals = torch.zeros_like(graph.pos)
-    normals[bottom,1] = -1
-    normals[top,1]    = +1
-    normals[right,0]  = +1
 
-    # interface masks and radial normals
+    neu_mask = left | right | bottom | top      # all outer nodes
+    normals  = torch.zeros_like(graph.pos)
+    normals[left,0]   = -1                      # ∂/∂x=0 face
+    normals[right,0]  = +1                      # ∂/∂x=0 face
+    normals[bottom,1] = -1                      # ∂/∂y=0 face
+    normals[top,1]    = +1                      # ∂/∂y=0 face
+
+    # 3) interface masks / normals (unchanged from before)
     dx = x - physics.cx;  dy = y - physics.cy
     r  = torch.sqrt(dx*dx + dy*dy)
     if1 = ((r > physics.r1 - tol) & (r < physics.r1 + tol)).squeeze()
@@ -80,67 +77,55 @@ def modelTrainer(config):
     rad_normals = torch.zeros_like(graph.pos)
     rad_normals[if1] = torch.cat([dx[if1]/r[if1], dy[if1]/r[if1]], dim=1)
     rad_normals[if2] = torch.cat([dx[if2]/r[if2], dy[if2]/r[if2]], dim=1)
-    
-    for epoch in range(1, config.epchoes + 1):  # Creates different ic and solves the problem, does this epoch # of times
-        
-        raw   = model(graph)                         # [N,1]
-        u_hat = physics._ansatz_u(graph, raw)        # hard‐enforce u(0)=1
 
-        # PDE residual + gradients
-        r_pde, grad_u = physics.pde_residual(graph, u_hat)  # r_pde [N,1], grad_u [N,2]
+    # 4) training loop
+    for epoch in range(1, config.epchoes+1):
+        raw     = model(graph)                     # [N,1]
+        u_hat   = physics._ansatz_u(graph, raw)    # now just raw
+        r_pde, grad_u = physics.pde_residual(graph, u_hat)
 
-        loss_pde = torch.mean((r_pde[interior_mask])**2 )
-    
+        # PDE loss (all nodes)
+        loss_pde = torch.mean(r_pde**2)
 
-        # Neumann‐BC loss: ∂u/∂n = 0 on right,top,bottom
-        dn = (grad_u * normals).sum(dim=1)               # [N]
+        # Neumann loss
+        dn       = (grad_u * normals).sum(dim=1)   # [N]
         loss_neu = torch.mean(dn[neu_mask]**2)
 
         # interface‐flux continuity
-        # flux‐jump at r1: (eps1−eps2)*(n·∇u)
         eps1,eps2,eps3 = physics.eps1,physics.eps2,physics.eps3
-        # mask1
-        n1 = rad_normals[if1]
-        gi = grad_u[if1]
-        jump1 = (eps1-eps2)*(gi * n1).sum(dim=1)
-        loss_if1 = torch.mean(jump1**2) if if1.any() else 0.0
-        # mask2
-        n2 = rad_normals[if2]
-        gj = grad_u[if2]
-        jump2 = (eps2-eps3)*(gj * n2).sum(dim=1)
-        loss_if2 = torch.mean(jump2**2) if if2.any() else 0.0
+        # inner circle
+        gi        = grad_u[if1];  n1 = rad_normals[if1]
+        jump1     = (eps1-eps2)*(gi * n1).sum(dim=1)
+        loss_if1  = if1.any().float() * torch.mean(jump1**2)
+        # outer ring
+        gj        = grad_u[if2];  n2 = rad_normals[if2]
+        jump2     = (eps2-eps3)*(gj * n2).sum(dim=1)
+        loss_if2  = if2.any().float() * torch.mean(jump2**2)
 
-        loss = ( loss_pde + config.lambda_neu * loss_neu + config.lambda_if  * (loss_if1 + loss_if2))
-        
-        config.optimizer.zero_grad()
+        loss = loss_pde \
+             + config.lambda_neu * loss_neu \
+             + config.lambda_if  * (loss_if1 + loss_if2)
+
+        opt.zero_grad()
         loss.backward(retain_graph=True)
-        config.optimizer.step()
-        scheduler.step()
-        
+        opt.step()
+        sched.step()
+
         if epoch % 500 == 0:
             print(f"[Epoch {epoch:4d}] Loss = {loss.item():.3e}")
-            
+
     model.save_model(config.optimizer)
-    print('model saved at loss: %.4e' % loss)    
     print("Training completed!")
-        
+
 @torch.no_grad()
 def modelTester(config):
-    """
-    Single‐shot evaluation of the trained steady‐state GNN.
-    Returns:
-      u_pred (numpy array [N,1]): Predicted solution at each mesh node.
-    """
-    # 1) Move model and graph to the right device
-    model = config.model.to(config.device)
-    graph = config.graph.to(config.device)
-
+    model   = config.model.to(config.device).eval()
+    graph   = config.graph.to(config.device)
     physics = config.func_main
 
     graph = physics.graph_modify(graph)
-    raw   = model(graph)                         # [N,1]
-    u_hat = physics._ansatz_u(graph, raw)        # hard‐enforce u(0)=1
-    return u_hat.cpu().numpy()                        # [N,1] NumPy
+    raw   = model(graph)
+    return raw.cpu().numpy()
 
 
 def compute_steady_error(u_pred, u_exact, config):
