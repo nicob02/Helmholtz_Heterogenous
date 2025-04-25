@@ -74,8 +74,10 @@ def run_fem(electrode_mesh, coords=None, r1=0.15, r2=0.30, eps1=4.0, eps2=2.0, e
     # 8) now sample at the same coords as graph.pos
     VV = np.empty((coords.shape[0],), float)
     pt = Point(0.0, 0.0)                   # reusable Point object
-    for i, (xi, yi) in enumerate(coords):
-        pt.x(), pt.y()[:] = xi, yi         # set point
-        VV[i] = U(pt)
+    for i, (xi, yi) in enumerate(coords):  
+        # rebuild a fresh Point for each (xi,yi)
+        p = Point(float(xi), float(yi))
+        VV[i] = U(p)
+
 
     return coords, VV
