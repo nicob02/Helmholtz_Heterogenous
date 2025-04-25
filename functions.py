@@ -22,7 +22,7 @@ class ElectroThermalFunc():
         self.r1,  self.r2            = r1, r2
         self.sigma                  = sigma
         self.bc_tol                 = bc_tol
-
+    
     def graph_modify(self, graph):
         """
         Build node features [x, y, eps(x), k(x), f(x,y)] all of shape [N,1].
@@ -59,10 +59,8 @@ class ElectroThermalFunc():
             - 2 * (math.pi ** 2) * (x + y) * torch.sin(math.pi * x) * torch.sin(math.pi * y)
         )
 
-        # first embed just the spatial coords:
-        coords = torch.cat([x,y], dim=-1)
-        fourier = self.ff(coords)   # __init__: self.ff = FourierFeatures(2, mapping_size=64, scale=20)
-        graph.x = torch.cat([fourier, eps, k, f], dim=-1)
+    
+        graph.x = torch.cat([x, y, eps, k, f], dim=-1)
 
         return graph
 
