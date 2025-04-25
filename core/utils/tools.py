@@ -138,8 +138,9 @@ def modelTester(config):
     physics = config.func_main
 
     graph = physics.graph_modify(graph)
-    raw   = model(graph)                          # [N,1]
-    return raw.cpu().numpy()                        # [N,1] NumPy
+    raw   = model(graph)                         # [N,1]
+    u_hat = physics._ansatz_u(graph, raw)        # hard‐enforce u(0)=1
+    return u_hat.cpu().numpy()                        # [N,1] NumPy
 
 
 def compute_steady_error(u_pred, u_exact, config):
