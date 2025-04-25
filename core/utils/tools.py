@@ -99,7 +99,7 @@ def modelTrainer(config):
 
         # 4) backward / step
         opt.zero_grad()
-        loss.backward()
+        loss.backward(retain=True)
         opt.step()
         sched.step()
 
