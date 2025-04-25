@@ -58,7 +58,7 @@ predicted_results = modelTester(test_config)
 pos_np = graph.pos.cpu().numpy()
 x, y   = pos_np[:,0], pos_np[:,1]
 
-coords_fem, V_vals_fem = run_fem(mesh=mesh, coords=graph.pos.cpu().numpy()) 
+coords_fem, V_vals_fem = run_fem(electrode_mesh=mesh, coords=graph.pos.cpu().numpy()) 
 
 # 3) Compute and print relative L2 errors
 err_V = compute_steady_error(predicted_results, V_vals_fem)
