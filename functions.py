@@ -59,7 +59,11 @@ class ElectroThermalFunc():
             - 2 * (math.pi ** 2) * (x + y) * torch.sin(math.pi * x) * torch.sin(math.pi * y)
         )
 
-        graph.x = torch.cat([x, y, eps, k, f], dim=-1)  # → [N,5]
+        # first embed just the spatial coords:
+        coords = torch.cat([x,y], dim=-1)
+        fourier = self.ff(coords)   # __init__: self.ff = FourierFeatures(2, mapping_size=64, scale=20)
+        graph.x = torch.cat([fourier, eps, k, f], dim=-1)
+
         return graph
 
 
