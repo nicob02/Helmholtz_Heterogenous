@@ -168,7 +168,7 @@ def compute_steady_error(u_pred, u_exact, config):
 
     return rel_l2
 
-def render_results(u_pred, u_exact, graph, filename="steady_results.png"):
+def render_results(u_pred, u_exact, graph, filename="NNvsFEM.png"):
     """
     Scatter‐plot Exact, Predicted, and Absolute Error on the mesh nodes.
     """
