@@ -5,7 +5,7 @@ from core.models import msgPassing
 from core.geometry import ElectrodeMesh
 from functions import ElectroThermalFunc as Func
 import os
-
+import matplotlib.pyplot as plt
 
 
 
