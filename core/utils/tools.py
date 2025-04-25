@@ -91,7 +91,7 @@ def modelTrainer(config):
         
         # 2) Dirichlet left‐face penalty
         u_left = u[left]                     # [#left,1]
-        Ldir   = torch.mean( (u_left - 1.0)**2 )
+        loss_dir   = torch.mean( (u_left - 1.0)**2 )
 
         # Neumann‐BC loss: ∂u/∂n = 0 on right,top,bottom
         dn = (grad_u * normals).sum(dim=1)               # [N]
@@ -111,7 +111,7 @@ def modelTrainer(config):
         jump2 = (eps2-eps3)*(gj * n2).sum(dim=1)
         loss_if2 = torch.mean(jump2**2) if if2.any() else 0.0
 
-        loss = ( loss_pde + config.lambda_dir * L_dir + config.lambda_neu * loss_neu + config.lambda_if  * (loss_if1 + loss_if2))
+        loss = ( loss_pde + config.lambda_dir * loss_dir + config.lambda_neu * loss_neu + config.lambda_if  * (loss_if1 + loss_if2))
         
         config.optimizer.zero_grad()
         loss.backward(retain_graph=True)
