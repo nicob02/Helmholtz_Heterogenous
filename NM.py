@@ -9,7 +9,6 @@ from fenics import (
 )
 from ufl import conditional, le, SpatialCoordinate, exp
 import numpy as np
-
 def run_fem(electrode_mesh,
             coords,
             r1=0.15, r2=0.30,
