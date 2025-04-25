@@ -54,6 +54,22 @@ setattr(test_config, 'lambda_if', 1.0)
 print('************* model test starts! ***********************')
 predicted_results = modelTester(test_config)
 
+pos_np = graph.pos.cpu().numpy()
+x, y   = pos_np[:,0], pos_np[:,1]
+
+fig, axes = plt.subplots(1, 2, figsize=(12,5), tight_layout=True)
+
+# Hz
+sc0 = axes[0].scatter(x, y, c=predicted_results.flatten(), cmap='viridis', s=5)
+axes[0].set_title("Predicted Voltage Distribution")
+axes[0].set_xlabel("x"); axes[0].set_ylabel("y")
+plt.colorbar(sc0, ax=axes[0], shrink=0.7)
+
+plt.savefig("Helmholz_Heterogenous.png", dpi=300)
+plt.close(fig)
+print("Done — predictions plotted to Helmholz_Heterogenous.png")
+
+"""
 u_exact = func_main.exact_solution(graph)  
 u_exact_np  = u_exact.detach().cpu().numpy()
 # 2) Compute exact & error
@@ -62,4 +78,4 @@ print(f"Relative L2 error: {rel_l2:.3e}")
 
 # 3) Render the three‐panel result
 render_results(predicted_results, u_exact_np, graph, filename="helmholtz_steady.png")
-
+"""
