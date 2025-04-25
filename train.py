@@ -89,6 +89,6 @@ setattr(train_config, 'writer', writer)
 setattr(train_config, 'func_main', func_main)
 setattr(train_config, 'lambda_neu', 1.0) 
 setattr(train_config, 'lambda_if', 1.0) 
-
+setattr(train_config, 'lambda_dir', 10.0) 
 modelTrainer(train_config)
 
