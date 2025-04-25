@@ -84,10 +84,11 @@ setattr(train_config, 'epchoes', 50)
 setattr(train_config, 'NodeTypesRef', ElectrodeMesh.node_type_ref) 
 setattr(train_config, 'step_times', 1)
 setattr(train_config, 'ndim', out_ndim)
-setattr(train_config, 'lrstep', 100) #learning rate decay epchoes
+setattr(train_config, 'lrstep', 500) #learning rate decay epchoes
 setattr(train_config, 'writer', writer)
 setattr(train_config, 'func_main', func_main)
-
+setattr(train_config, 'lambda_neu', 1.0) 
+setattr(train_config, 'lambda_if', 1.0) 
 
 modelTrainer(train_config)
 
