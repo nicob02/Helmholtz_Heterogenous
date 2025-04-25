@@ -57,8 +57,17 @@ predicted_results = modelTester(test_config)
 pos_np = graph.pos.cpu().numpy()
 x, y   = pos_np[:,0], pos_np[:,1]
 
-fig, axes = plt.subplots(1, 2, figsize=(12,5), tight_layout=True)
+coords_fem, V_vals_fem = run_fem(mesh=mesh, coords=graph.pos.cpu().numpy()) 
 
+# 3) Compute and print relative L2 errors
+err_V = compute_steady_error(predicted_results, V_vals_fem)
+print(f"Rel L2 error Voltage:     {err_V:.3e}")
+
+render_results(predicted_results, V_vals_fem, graph, filename="NNvsFEM.png")
+
+
+
+fig, axes = plt.subplots(1, 2, figsize=(12,5), tight_layout=True)
 # Hz
 sc0 = axes[0].scatter(x, y, c=predicted_results.flatten(), cmap='viridis', s=5)
 axes[0].set_title("Predicted Voltage Distribution")
