@@ -72,9 +72,10 @@ class ElectroThermalFunc():
         D = ( torch.tanh(math.pi * x) 
             * torch.tanh(math.pi * (1.0 - x))
             * torch.tanh(math.pi * y)
-            * torch.tanh(math.pi * (1.0 - y)) )
+            * torch.tanh(math.pi * (1.0 - y)) ).detach()
         # G(x,y) = 0 everywhere on boundary:
-        G = torch.zeros_like(x)
+        G = torch.zeros_like(x).detach()
+        
         return G + D * u_raw
 
     def pde_residual(self, graph, u):
