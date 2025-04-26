@@ -17,7 +17,7 @@ func_main = Func(eps=(4.0,2.0,1.0),
     center=(0.5,0.5),
     r1=0.15,
     r2=0.30,
-    bc_tol=1e-3
+    bc_tol=1e-2
 )
 
 mapping_size = 64
@@ -94,7 +94,7 @@ setattr(train_config, 'graph', graph)
 setattr(train_config, 'model', model)
 setattr(train_config, 'optimizer', optimizer)
 setattr(train_config, 'train_steps', 1)    # 1 train step, extend this in the future to a dynamic source function that changes with time.
-setattr(train_config, 'epchoes', 30)
+setattr(train_config, 'epchoes', 2500)
 setattr(train_config, 'NodeTypesRef', ElectrodeMesh.node_type_ref) 
 setattr(train_config, 'step_times', 1)
 setattr(train_config, 'ndim', out_ndim)
