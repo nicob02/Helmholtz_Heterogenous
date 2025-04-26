@@ -33,7 +33,7 @@ model = msgPassing(
     ndim=out_ndim,
     device=device,
     fourier_mapping_size=64,
-    fourier_scale=0.2,
+    fourier_scale=0.02,
     model_dir=ckptpath
 )
 model.to(device)
